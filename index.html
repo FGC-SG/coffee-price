@@ -3,7 +3,7 @@
 {
   "name": "Robusta Grade Valuation",
   "schemaVersion": 1,
-  "description": "Standalone Indonesia Robusta grade valuation calculator. Prices SNI Grades 1-6 off the London ICE Robusta base price. Per-grade % delta is directly editable (seeded from Grade 1 / Grade 5 anchors via 3-anchor interpolation, re-seedable on demand). Live recompute, base-price source disclosed on-screen and on print, Print/Save-PDF and Download CSV. Base price indicative (IFC Markets) unless replaced with official ICE settlement.",
+  "description": "Standalone Indonesia Robusta grade valuation calculator. Prices SNI Grades 1-6 off the London ICE Robusta base price. Per-grade % delta is directly editable (seeded from Grade 1 / Grade 5 anchors via 3-anchor interpolation, re-seedable). Live recompute, base-price source disclosed on-screen and on print, Update Now (fetch /api/price), Print/Save-PDF, Download CSV, and a no-JS static fallback. Base price indicative unless replaced with official ICE settlement.",
   "mcpTools": [],
   "mcpServerNames": []
 }
@@ -81,8 +81,8 @@
   </header>
 
   <div class="src" id="srcBanner">
-    <b>BASE PRICE SOURCE:</b> <span id="srcText"></span>
-    <div class="stamp" id="stamp"></div>
+    <b>BASE PRICE SOURCE:</b> <span id="srcText">IFC Markets (indicative live quote) — base $3,829/MT</span>
+    <div class="stamp" id="stamp">As-of 2026-08-11 · INDICATIVE unless replaced with official ICE settlement</div>
   </div>
 
   <h2 class="sec">Inputs</h2>
@@ -114,9 +114,9 @@
   </div>
 
   <div class="kpi">
-    <div class="card"><div class="l">ICE base price</div><div class="v" id="kIce"></div></div>
-    <div class="card"><div class="l">Basis deduction</div><div class="v" id="kBasis"></div></div>
-    <div class="card"><div class="l">Base FOB — Grade 4b</div><div class="v" id="kBase"></div></div>
+    <div class="card"><div class="l">ICE base price</div><div class="v" id="kIce">$3,829</div></div>
+    <div class="card"><div class="l">Basis deduction</div><div class="v" id="kBasis">$150</div></div>
+    <div class="card"><div class="l">Base FOB — Grade 4b</div><div class="v" id="kBase">$3,679</div></div>
   </div>
 
   <h2 class="sec">Valuation by Grade</h2>
@@ -127,13 +127,17 @@
     </tr></thead>
     <tbody id="body"></tbody>
   </table>
+  <noscript><div class="src" style="background:#fdeeee;border-color:#e0a0a0;border-left-color:#C00000;color:#7a1a1a;">
+    <b>Note:</b> Interactive recompute requires JavaScript. The table above shows the values as at the stated as-of date; to change inputs and re-value, open this file in a browser with scripting enabled, or use the downloadable Excel/CSV version.</div></noscript>
   <div class="tblnote">The <b>% delta vs base</b> column is editable — type a differential for any grade. Anchors seed these values; use <b>Reset deltas from anchors</b> to restore the interpolated defaults.</div>
 
   <div class="btns">
-    <button onclick="window.print()">🖨 Print / Save PDF</button>
+    <button onclick="updatePrice(this)">🔄 Update Now (fetch latest price)</button>
+    <button class="alt" onclick="window.print()">🖨 Print / Save PDF</button>
     <button class="alt" onclick="downloadCSV()">⬇ Download CSV</button>
     <button class="alt" onclick="seedFromAnchors();recompute()">↻ Reset deltas from anchors</button>
   </div>
+  <div id="updMsg" style="font-size:11px;color:#666;margin:-8px 0 8px;"></div>
 
   <div class="disc-note">
     <b>Method:</b> Base FOB (Grade 4b / EK-1 G4/80def) = ICE base + country differential − basis stack.
@@ -145,8 +149,8 @@
     <a href="https://www.ice.com/products/37089079/Robusta-Coffee-Futures">ICE Robusta contract</a> ·
     <a href="https://gaeki.or.id/standar-mutu/">SNI 01-2907-2008 (GAEKI)</a> ·
     <a href="https://ska-indonesia.com/commodities/robusta/robusta-ek-1-grade-4-80-def/">EK-1 G4/80def</a><br>
-    <b>Disclaimer:</b> Internal decision-support tool for Felicity Global Capital — not an official price or trade recommendation.
-    The base price is indicative unless replaced with an official ICE settlement. Verify against live market data before pricing a deal or striking collateral values.
+    <b>Disclaimer:</b> Provided by Felicity Global Capital Pte. Ltd. for information only. This is an indicative valuation framework — <b>not an offer, a price quotation, or a recommendation to transact</b>.
+    Grade differentials are indicative and not historically calibrated; the base price is indicative unless expressly stated to be an official ICE settlement. Recipients must independently verify all inputs against live market data and apply their own risk parameters before relying on any figure.
   </div>
 </div>
 
@@ -239,6 +243,27 @@ function downloadCSV(){
   a.href=url; a.download="robusta-valuation-"+$("asof").value+".csv";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// Fetch latest indicative price from the serverless endpoint /api/price
+async function updatePrice(btn){
+  const old=btn.textContent, msg=$("updMsg");
+  btn.textContent="Updating…"; btn.disabled=true; msg.style.color="#666"; msg.textContent="Fetching latest indicative Robusta price…";
+  try{
+    const r=await fetch("/api/price",{cache:"no-store"});
+    const j=await r.json();
+    if(!r.ok || !j.price) throw new Error((j&&j.message)||"no price returned");
+    $("ice").value=Math.round(j.price);
+    if(j.source) $("src").value=j.source;
+    if(j.asof) $("asof").value=j.asof;
+    recompute();
+    btn.textContent="✓ Updated"; msg.style.color="#0a7d3c";
+    msg.textContent="Updated: "+money(j.price)+"/MT · "+(j.source||"")+" · "+(j.asof||"")+" (indicative, not official settlement)";
+  }catch(e){
+    btn.textContent="✗ Failed"; msg.style.color="#C00000";
+    msg.textContent="Couldn't fetch a live price ("+e.message+"). Enter the price manually in the ICE field above.";
+  }
+  setTimeout(()=>{btn.textContent=old; btn.disabled=false;},2500);
 }
 
 // Base inputs recompute in place; anchor inputs re-seed the delta column first
