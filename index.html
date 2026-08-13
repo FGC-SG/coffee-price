@@ -45,7 +45,10 @@
   input.dpct{width:100%;border:1px solid var(--line);border-radius:4px;padding:4px 6px;
              font-size:13px;font-family:inherit;text-align:right;background:#fff;}
   input.dpct:focus{outline:2px solid var(--ltblue);border-color:var(--navy);}
+  input.dpct[readonly]{background:#eef0f3;color:#333;border-color:#d3d7de;cursor:not-allowed;}
+  input.dpct[readonly]:focus{outline:none;border-color:#d3d7de;}
   tr.base input.dpct{background:#eef2fb;font-weight:700;}
+  tr.base input.dpct[readonly]{background:#e3e8f2;}
   .kpi{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0;}
   .kpi .card{flex:1;min-width:150px;background:var(--ltblue);border:1px solid #b9c8e8;border-radius:6px;padding:10px 14px;}
   .kpi .card .l{font-size:11px;color:var(--navy);font-weight:700;text-transform:uppercase;}
@@ -65,7 +68,8 @@
     .fld{background:#fff;border:none;padding:2px 0;}
     .fld input{border:none;padding:0;font-weight:700;background:#fff;}
     input.dpct{border:none;padding:0;font-weight:700;background:#fff;text-align:right;}
-    tr.base input.dpct{background:var(--ltblue);}
+    input.dpct[readonly]{border:none;background:#fff;color:var(--ink);}
+    tr.base input.dpct,tr.base input.dpct[readonly]{background:var(--ltblue);}
     td.dcell{padding:7px 9px;}
     header{border-radius:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     th,tr.base td,.kpi .card,.src{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -129,13 +133,14 @@
   </table>
   <noscript><div class="src" style="background:#fdeeee;border-color:#e0a0a0;border-left-color:#C00000;color:#7a1a1a;">
     <b>Note:</b> Interactive recompute requires JavaScript. The table above shows the values as at the stated as-of date; to change inputs and re-value, open this file in a browser with scripting enabled, or use the downloadable Excel/CSV version.</div></noscript>
-  <div class="tblnote">The <b>% delta vs base</b> column is editable — type a differential for any grade. Anchors seed these values; use <b>Reset deltas from anchors</b> to restore the interpolated defaults.</div>
+  <div class="tblnote" id="tblnote"></div>
 
   <div class="btns">
+    <button id="editBtn" onclick="toggleEdit()">✏️ Edit % delta</button>
     <button onclick="updatePrice(this)">🔄 Update Now (fetch latest price)</button>
     <button class="alt" onclick="window.print()">🖨 Print / Save PDF</button>
     <button class="alt" onclick="downloadCSV()">⬇ Download CSV</button>
-    <button class="alt" onclick="seedFromAnchors();recompute()">↻ Reset deltas from anchors</button>
+    <button class="alt" id="resetBtn" onclick="seedFromAnchors();recompute()" style="display:none">↻ Reset deltas from anchors</button>
   </div>
   <div id="updMsg" style="font-size:11px;color:#666;margin:-8px 0 8px;"></div>
 
@@ -188,7 +193,7 @@ function buildTable(){
     const tr=document.createElement("tr");
     if(row.type==="base") tr.className="base";
     tr.innerHTML=`<td class="g">${row.g}</td><td>${row.def}</td>
-      <td class="dcell"><input class="dpct" id="d${i}" type="number" step="0.1" value="0"></td>
+      <td class="dcell"><input class="dpct" id="d${i}" type="number" step="0.1" value="0" readonly></td>
       <td id="fob${i}"></td><td id="disc${i}"></td><td id="lot${i}"></td>`;
     body.appendChild(tr);
     $("d"+i).addEventListener("input",recompute);
@@ -200,6 +205,19 @@ function seedFromAnchors(){
   const a1=(+$("a1").value||0)/100, a5=(+$("a5").value||0)/100;
   deltaSeeds(a1,a5).forEach((d,i)=>{ $("d"+i).value=(d*100).toFixed(1); });
 }
+
+// Lock (default) / unlock the editable delta column to prevent accidental edits
+let EDITABLE=false;
+function setEditable(on){
+  EDITABLE=on;
+  GRADES.forEach((_,i)=>{ const el=$("d"+i); if(el) el.readOnly=!on; });
+  $("editBtn").textContent = on ? "🔒 Lock % delta" : "✏️ Edit % delta";
+  $("resetBtn").style.display = on ? "" : "none";
+  $("tblnote").innerHTML = on
+    ? 'The <b>% delta vs base</b> column is <b>unlocked</b> — type a differential for any grade. Anchors re-seed these values; use <b>Reset deltas from anchors</b> to restore the interpolated defaults. Click <b>🔒 Lock % delta</b> when done.'
+    : 'The <b>% delta vs base</b> column is <b>locked</b> to prevent accidental edits. Click <b>✏️ Edit % delta</b> to change a grade&rsquo;s differential.';
+}
+function toggleEdit(){ setEditable(!EDITABLE); }
 
 let LAST=[];
 function recompute(){
@@ -277,6 +295,7 @@ async function updatePrice(btn){
 buildTable();
 seedFromAnchors();
 recompute();
+setEditable(false);
 </script>
 </body>
 </html>
