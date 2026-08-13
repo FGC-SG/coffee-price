@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Robusta Grade Valuation",
+  "schemaVersion": 1,
+  "description": "Standalone Indonesia Robusta grade valuation calculator. Prices SNI Grades 1-6 off the London ICE Robusta base price. Per-grade % delta is directly editable (seeded from Grade 1 / Grade 5 anchors via 3-anchor interpolation, re-seedable on demand). Live recompute, base-price source disclosed on-screen and on print, Print/Save-PDF and Download CSV. Base price indicative (IFC Markets) unless replaced with official ICE settlement.",
+  "mcpTools": [],
+  "mcpServerNames": []
+}
+</script>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indonesia Robusta — Daily Grade Valuation</title>
+<style>
+  :root{
+    --navy:#1F3864; --navy2:#2E4C7E; --ltblue:#D9E1F2; --grey:#F2F2F2;
+    --line:#BFBFBF; --ink:#1a1a1a; --amber:#8a5a00; --amberbg:#FFF4D6;
+    --green:#0a7d3c; --red:#C00000;
+  }
+  *{box-sizing:border-box}
+  body{font-family:Calibri,Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#eef1f6;}
+  .wrap{max-width:960px;margin:0 auto;padding:20px;background:#fff;}
+  header{background:var(--navy);color:#fff;padding:18px 22px;border-radius:6px 6px 0 0;}
+  header h1{margin:0;font-size:21px;font-weight:700;}
+  header .sub{font-size:12.5px;color:#cdd8ef;margin-top:4px;}
+  .src{background:var(--amberbg);border:1px solid #e5c977;border-left:5px solid var(--amber);
+       padding:10px 14px;font-size:12.5px;color:#5a3d00;border-radius:4px;margin:14px 0;}
+  .src b{color:var(--amber);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0;}
+  .fld{background:var(--grey);border:1px solid var(--line);border-radius:5px;padding:8px 10px;}
+  .fld label{display:block;font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px;}
+  .fld input{width:100%;border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:14px;font-family:inherit;}
+  .fld input:focus{outline:2px solid var(--ltblue);border-color:var(--navy);}
+  .fld .hint{font-size:10.5px;color:#666;margin-top:3px;}
+  h2.sec{background:var(--navy);color:#fff;font-size:14px;margin:18px 0 0;padding:8px 12px;border-radius:4px 4px 0 0;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:right;}
+  th{background:var(--navy2);color:#fff;font-weight:600;text-align:center;font-size:12px;}
+  td.g{text-align:left;font-weight:700;}
+  tr.base td{background:var(--ltblue);font-weight:700;}
+  td.prem{color:var(--green);} td.disc{color:var(--red);}
+  td.dcell{padding:3px 5px;}
+  input.dpct{width:100%;border:1px solid var(--line);border-radius:4px;padding:4px 6px;
+             font-size:13px;font-family:inherit;text-align:right;background:#fff;}
+  input.dpct:focus{outline:2px solid var(--ltblue);border-color:var(--navy);}
+  tr.base input.dpct{background:#eef2fb;font-weight:700;}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0;}
+  .kpi .card{flex:1;min-width:150px;background:var(--ltblue);border:1px solid #b9c8e8;border-radius:6px;padding:10px 14px;}
+  .kpi .card .l{font-size:11px;color:var(--navy);font-weight:700;text-transform:uppercase;}
+  .kpi .card .v{font-size:20px;font-weight:700;color:var(--navy);margin-top:2px;}
+  .tblnote{font-size:11px;color:#555;margin:6px 2px 0;}
+  .btns{margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;}
+  button{background:var(--navy);color:#fff;border:0;border-radius:5px;padding:10px 18px;font-size:13.5px;
+          font-weight:600;cursor:pointer;font-family:inherit;}
+  button.alt{background:#fff;color:var(--navy);border:1.5px solid var(--navy);}
+  button:hover{opacity:.9;}
+  .disc-note{font-size:11px;color:#555;line-height:1.5;margin-top:16px;border-top:1px solid var(--line);padding-top:10px;}
+  .disc-note a{color:#0563C1;}
+  .stamp{font-size:11px;color:#666;margin-top:4px;}
+  @media print{
+    body{background:#fff;} .wrap{max-width:100%;padding:0;}
+    .btns,.fld .hint,.tblnote{display:none !important;}
+    .fld{background:#fff;border:none;padding:2px 0;}
+    .fld input{border:none;padding:0;font-weight:700;background:#fff;}
+    input.dpct{border:none;padding:0;font-weight:700;background:#fff;text-align:right;}
+    tr.base input.dpct{background:var(--ltblue);}
+    td.dcell{padding:7px 9px;}
+    header{border-radius:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    th,tr.base td,.kpi .card,.src{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    @page{margin:14mm;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <h1>Indonesia Robusta — Daily Grade Valuation</h1>
+    <div class="sub">SNI Grades 1–6 · base grade EK-1 G4/80def · priced off London ICE Robusta (RC) · Felicity Global Capital</div>
+  </header>
+
+  <div class="src" id="srcBanner">
+    <b>BASE PRICE SOURCE:</b> <span id="srcText"></span>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <h2 class="sec">Inputs</h2>
+  <div class="grid">
+    <div class="fld"><label>ICE Robusta base price (USD/MT)</label>
+      <input id="ice" type="number" step="1" value="3829">
+      <div class="hint">Best-effort indicative — overwrite with official settle</div></div>
+    <div class="fld"><label>Base price source</label>
+      <input id="src" type="text" value="IFC Markets (indicative live quote)">
+      <div class="hint">Shown on the table & printout</div></div>
+    <div class="fld"><label>As-of date</label>
+      <input id="asof" type="date" value="2026-08-11">
+      <div class="hint">Fetch / mark date</div></div>
+    <div class="fld"><label>Country differential ± (USD/MT)</label>
+      <input id="cdiff" type="number" step="1" value="0">
+      <div class="hint">+ = Indonesia premium over London</div></div>
+    <div class="fld"><label>Basis stack ICE→FOB (USD/MT)</label>
+      <input id="basis" type="number" step="1" value="150">
+      <div class="hint">Freight + insurance + landing</div></div>
+    <div class="fld"><label>Qty per lot (MT)</label>
+      <input id="qty" type="number" step="0.1" value="19.2">
+      <div class="hint">Default one 20ft FCL</div></div>
+    <div class="fld"><label>Anchor — Grade 1 delta (%)</label>
+      <input id="a1" type="number" step="0.1" value="4.5">
+      <div class="hint">Editing re-seeds the table deltas</div></div>
+    <div class="fld"><label>Anchor — Grade 5 delta (%)</label>
+      <input id="a5" type="number" step="0.1" value="-6.0">
+      <div class="hint">Editing re-seeds the table deltas</div></div>
+  </div>
+
+  <div class="kpi">
+    <div class="card"><div class="l">ICE base price</div><div class="v" id="kIce"></div></div>
+    <div class="card"><div class="l">Basis deduction</div><div class="v" id="kBasis"></div></div>
+    <div class="card"><div class="l">Base FOB — Grade 4b</div><div class="v" id="kBase"></div></div>
+  </div>
+
+  <h2 class="sec">Valuation by Grade</h2>
+  <table id="tbl">
+    <thead><tr>
+      <th style="text-align:left">SNI Grade</th><th>Defect<br>(worst)</th><th>% delta<br>vs base</th>
+      <th>FOB<br>USD/MT</th><th>Discount<br>vs ICE</th><th>Lot value<br>USD</th>
+    </tr></thead>
+    <tbody id="body"></tbody>
+  </table>
+  <div class="tblnote">The <b>% delta vs base</b> column is editable — type a differential for any grade. Anchors seed these values; use <b>Reset deltas from anchors</b> to restore the interpolated defaults.</div>
+
+  <div class="btns">
+    <button onclick="window.print()">🖨 Print / Save PDF</button>
+    <button class="alt" onclick="downloadCSV()">⬇ Download CSV</button>
+    <button class="alt" onclick="seedFromAnchors();recompute()">↻ Reset deltas from anchors</button>
+  </div>
+
+  <div class="disc-note">
+    <b>Method:</b> Base FOB (Grade 4b / EK-1 G4/80def) = ICE base + country differential − basis stack.
+    Each grade's FOB = Base FOB × (1 + % delta). The % delta column is user-editable; by default Grades 2/3/4a
+    interpolate linearly on worst-allowed defect value between the Grade 1 and Grade 4b anchors, and Grade 6
+    extrapolates beyond the Grade 5 anchor (often no bid). Grade differentials are indicative — calibrate to live broker/Reuters prints.<br>
+    <b>Sources:</b>
+    <a href="https://www.ifcmarkets.com/en/market-data/commodities-prices/robusta">IFC Markets Robusta</a> ·
+    <a href="https://www.ice.com/products/37089079/Robusta-Coffee-Futures">ICE Robusta contract</a> ·
+    <a href="https://gaeki.or.id/standar-mutu/">SNI 01-2907-2008 (GAEKI)</a> ·
+    <a href="https://ska-indonesia.com/commodities/robusta/robusta-ek-1-grade-4-80-def/">EK-1 G4/80def</a><br>
+    <b>Disclaimer:</b> Internal decision-support tool for Felicity Global Capital — not an official price or trade recommendation.
+    The base price is indicative unless replaced with an official ICE settlement. Verify against live market data before pricing a deal or striking collateral values.
+  </div>
+</div>
+
+<script>
+const GRADES=[
+ {g:"Grade 1",  def:11,  type:"anchor"},
+ {g:"Grade 2",  def:25,  type:"interp"},
+ {g:"Grade 3",  def:44,  type:"interp"},
+ {g:"Grade 4a", def:60,  type:"interp"},
+ {g:"Grade 4b", def:80,  type:"base"},
+ {g:"Grade 5",  def:150, type:"anchor"},
+ {g:"Grade 6",  def:225, type:"extrap"},
+];
+const $=id=>document.getElementById(id);
+const money=v=>"$"+Math.round(v).toLocaleString("en-US");
+const pct=v=>(v>=0?"+":"")+ (v*100).toFixed(1)+"%";
+
+// Interpolated delta seed values (as %), from the two anchors
+function deltaSeeds(a1,a5){
+  const D1=11,D4b=80,D5=150;
+  const lin=(x,x0,y0,x1,y1)=>y0+(x-x0)*(y1-y0)/(x1-x0);
+  return GRADES.map(row=>{
+    if(row.type==="base") return 0;
+    if(row.g==="Grade 1") return a1;
+    if(row.g==="Grade 5") return a5;
+    if(row.g==="Grade 6") return lin(row.def,D4b,0,D5,a5);   // extrapolate beyond G5
+    return lin(row.def,D1,a1,D4b,0);                          // G2,G3,G4a between G1 & G4b
+  });
+}
+
+// Build the grade table once, with an editable delta input per row
+function buildTable(){
+  const body=$("body"); body.innerHTML="";
+  GRADES.forEach((row,i)=>{
+    const tr=document.createElement("tr");
+    if(row.type==="base") tr.className="base";
+    tr.innerHTML=`<td class="g">${row.g}</td><td>${row.def}</td>
+      <td class="dcell"><input class="dpct" id="d${i}" type="number" step="0.1" value="0"></td>
+      <td id="fob${i}"></td><td id="disc${i}"></td><td id="lot${i}"></td>`;
+    body.appendChild(tr);
+    $("d"+i).addEventListener("input",recompute);
+  });
+}
+
+// Fill the delta inputs from the anchor-based interpolation
+function seedFromAnchors(){
+  const a1=(+$("a1").value||0)/100, a5=(+$("a5").value||0)/100;
+  deltaSeeds(a1,a5).forEach((d,i)=>{ $("d"+i).value=(d*100).toFixed(1); });
+}
+
+let LAST=[];
+function recompute(){
+  const ice=+$("ice").value||0, cdiff=+$("cdiff").value||0, basis=+$("basis").value||0,
+        qty=+$("qty").value||0;
+  const baseFOB=ice+cdiff-basis;
+  $("kIce").textContent=money(ice);
+  $("kBasis").textContent=money(basis);
+  $("kBase").textContent=money(baseFOB);
+  $("srcText").textContent=$("src").value+" — base "+money(ice)+"/MT";
+  $("stamp").textContent="As-of "+$("asof").value+" · INDICATIVE unless replaced with official ICE settlement";
+  LAST=[];
+  GRADES.forEach((row,i)=>{
+    const d=(+$("d"+i).value||0)/100;
+    const fob=baseFOB*(1+d), disc=ice?(ice-fob)/ice:0, lot=fob*qty;
+    $("fob"+i).textContent=money(fob);
+    const dc=$("disc"+i); dc.textContent=pct(disc); dc.className=disc<0?"prem":(disc>0?"disc":"");
+    $("lot"+i).textContent=money(lot);
+    LAST.push([row.g,row.def,(d*100).toFixed(1)+"%",Math.round(fob),(disc*100).toFixed(1)+"%",Math.round(lot)]);
+  });
+}
+
+function downloadCSV(){
+  const hdr=["SNI Grade","Defect (worst)","% delta vs base","FOB USD/MT","Discount vs ICE","Lot value USD"];
+  const meta=[
+    ["Indonesia Robusta — Daily Grade Valuation"],
+    ["Base price source",$("src").value],
+    ["ICE base price (USD/MT)",$("ice").value],
+    ["As-of date",$("asof").value],
+    ["Country differential (USD/MT)",$("cdiff").value],
+    ["Basis stack (USD/MT)",$("basis").value],
+    ["NOTE","Indicative unless replaced with official ICE settlement — not a trade recommendation"],
+    [],
+  ];
+  const esc=v=>{v=String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  let csv=meta.map(r=>r.map(esc).join(",")).join("\n")+"\n";
+  csv+=hdr.join(",")+"\n"+LAST.map(r=>r.map(esc).join(",")).join("\n")+"\n";
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="robusta-valuation-"+$("asof").value+".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Base inputs recompute in place; anchor inputs re-seed the delta column first
+["ice","src","asof","cdiff","basis","qty"].forEach(id=>{
+  $(id).addEventListener("input",recompute);
+});
+["a1","a5"].forEach(id=>{
+  $(id).addEventListener("input",()=>{ seedFromAnchors(); recompute(); });
+});
+
+buildTable();
+seedFromAnchors();
+recompute();
+</script>
+</body>
+</html>
